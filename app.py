@@ -32,19 +32,35 @@ IMAGE_PROMPT_SYSTEM = (
 )
 
 SEO_BLOG_SYSTEM = (
-    "당신은 네이버 블로그 SEO 최적화 전문 작가입니다. "
-    "주어진 키워드/주제로 네이버 검색 상위 노출에 최적화된 블로그 글을 작성해주세요.\n"
+    "당신은 네이버 블로그 SEO 최적화 전문 작가입니다. 아래 규칙을 빠짐없이 지켜 작성하세요.\n\n"
+
+    "【키워드 전략】\n"
+    "- 입력 키워드의 형태소를 분석해 연관도 높은 단어군 5개를 related_keywords에 추출하세요.\n"
+    "- 본문 전체에서 동일 단어·반복 표현을 철저히 피하고 유의어·우회 표현으로 다양하게 서술하세요.\n"
+    "- 사전적 정의나 개념 설명은 배제하고 실질적·경험적 정보 위주로 작성하세요.\n"
+    "- 질의 의도를 파악해 키워드 형태소를 각 본문에 자연스럽게 분배하세요.\n\n"
+
+    "【제목 규칙】\n"
+    "- 형식: 메인키워드를 맨 왼쪽에 배치 + 부사·꾸밈어 등 구체적 의미 없는 수식어로 구성\n"
+    "- 클릭률 높은 표현 사용 (궁금증 유발, 숫자, 이득 강조), 30자 이내\n\n"
+
+    "【구조 규칙 — 서론·본론1·본론2·결론 순서】\n"
+    "각 파트는 반드시 소제목 → 인용구 → 본문 순서로 작성하세요.\n"
+    "- 서론 소제목: 제목과 완전히 동일하게\n"
+    "- 본론1·본론2 소제목: 제목의 핵심어를 발췌해 세분화\n"
+    "- 결론 소제목: 행동 유도형 마무리 문장\n"
+    "- 인용구: 해당 본문의 핵심 내용을 1문장으로 임팩트 있게 요약 (따옴표 없이)\n"
+    "- 본문: 보고서 형식, 250자 내외, 동일 단어 반복 절대 금지\n\n"
+
     "반드시 아래 JSON 형식으로만 응답하세요:\n"
-    '{"title": "제목", "intro": "도입부", '
-    '"sections": [{"heading": "소제목", "body": "본문내용"}], '
-    '"conclusion": "마무리", "hashtags": ["태그1", "태그2"]}\n\n'
-    "작성 규칙:\n"
-    "- 제목: 핵심 키워드 포함, 30자 이내, 클릭을 유도하는 문장\n"
-    "- 도입부: 2-3문장, 공감 유도, 핵심 키워드 자연스럽게 포함\n"
-    "- 소제목 3-4개: 각 250자 내외, 세부 키워드 포함, 구체적 정보 제공\n"
-    "- 마무리: 요약 + 독자 행동 유도 (공감, 댓글, 이웃추가)\n"
-    "- 해시태그: 12개, 핵심 키워드 + 연관 키워드 혼합\n"
-    "- 전체 키워드 밀도 2-3% 유지"
+    '{"title": "제목", '
+    '"related_keywords": ["연관어1", "연관어2", "연관어3", "연관어4", "연관어5"], '
+    '"sections": ['
+    '{"type": "서론", "heading": "소제목", "quote": "인용구", "body": "본문"}, '
+    '{"type": "본론1", "heading": "소제목", "quote": "인용구", "body": "본문"}, '
+    '{"type": "본론2", "heading": "소제목", "quote": "인용구", "body": "본문"}, '
+    '{"type": "결론", "heading": "소제목", "quote": "인용구", "body": "본문"}], '
+    '"hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6","태그7","태그8","태그9","태그10","태그11","태그12"]}'
 )
 
 
@@ -359,9 +375,7 @@ if generate:
             st.stop()
 
     data = st.session_state.seo_result
-    blog_content = data.get("intro", "") + " " + " ".join(
-        s["body"] for s in data.get("sections", [])
-    )
+    blog_content = " ".join(s["body"] for s in data.get("sections", []))
 
     with st.spinner("이미지 프롬프트 생성 중..."):
         try:
@@ -387,41 +401,55 @@ if st.session_state.seo_result:
     data = st.session_state.seo_result
     st.divider()
 
-    # 제목 (보라)
+    # 제목
     st.markdown(f"""
     <div class="card-purple">
         <div class="title-label">제목</div>
         <div class="title-text">{data.get('title', '')}</div>
     </div>""", unsafe_allow_html=True)
 
-    # 도입부 (흰색)
-    st.markdown(f"""
-    <div class="card-white">
-        <div class="section-heading">도입부</div>
-        <div style="line-height:1.8;">{data.get('intro', '')}</div>
-    </div>""", unsafe_allow_html=True)
+    # 연관 키워드
+    related = data.get("related_keywords", [])
+    if related:
+        kw_html = "".join(f'<span class="chip">#{k}</span>' for k in related)
+        st.markdown(
+            f'<div style="margin-bottom:20px;"><div style="font-size:0.8rem;color:#aaa;margin-bottom:8px;">연관 키워드</div>'
+            f'<div class="example-chips">{kw_html}</div></div>',
+            unsafe_allow_html=True,
+        )
 
-    # 본문 섹션 (노랑/파랑 교대)
-    colors = ["card-yellow", "card-blue", "card-yellow", "card-blue"]
-    for idx, section in enumerate(data.get("sections", [])):
-        c = colors[idx % len(colors)]
+    # 섹션별 카드 (소제목 → 인용구 → 본문)
+    section_colors = {"서론": "card-white", "본론1": "card-yellow", "본론2": "card-blue", "결론": "card-purple"}
+    for section in data.get("sections", []):
+        stype  = section.get("type", "")
+        card_c = section_colors.get(stype, "card-white")
+        label  = stype
+        heading = section.get("heading", "")
+        quote   = section.get("quote", "")
+        body    = section.get("body", "")
+
         st.markdown(f"""
-        <div class="{c}">
-            <div class="section-heading">{section.get('heading', '')}</div>
-            <div style="line-height:1.8;">{section.get('body', '')}</div>
+        <div class="{card_c}" style="margin-bottom:6px;">
+            <div class="title-label">{label}</div>
+            <div class="section-heading" style="font-size:1.15rem;margin-bottom:12px;">{heading}</div>
         </div>""", unsafe_allow_html=True)
 
-    # 마무리 (흰색)
-    st.markdown(f"""
-    <div class="card-white">
-        <div class="section-heading">마무리</div>
-        <div style="line-height:1.8;">{data.get('conclusion', '')}</div>
-    </div>""", unsafe_allow_html=True)
+        if quote:
+            st.markdown(f"""
+            <div style="border-left:4px solid #C0392B;background:#FDF5F4;
+                        border-radius:0 12px 12px 0;padding:14px 20px;
+                        margin-bottom:6px;font-size:0.97rem;color:#7a2020;
+                        font-style:italic;line-height:1.7;">
+                {quote}
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown(f"""
+        <div class="card-white" style="margin-bottom:20px;">
+            <div style="line-height:1.9;font-size:0.97rem;">{body}</div>
+        </div>""", unsafe_allow_html=True)
 
     # 해시태그
-    tags_html = "".join(
-        f'<span class="hashtag">#{t}</span>' for t in data.get("hashtags", [])
-    )
+    tags_html = "".join(f'<span class="hashtag">#{t}</span>' for t in data.get("hashtags", []))
     st.markdown(f"""
     <div class="card-white">
         <div class="section-heading">해시태그</div>
@@ -429,10 +457,12 @@ if st.session_state.seo_result:
     </div>""", unsafe_allow_html=True)
 
     # 전체 글 복사
-    full_text = f"{data.get('title', '')}\n\n{data.get('intro', '')}\n\n"
+    full_text = f"{data.get('title', '')}\n\n"
     for s in data.get("sections", []):
-        full_text += f"■ {s.get('heading', '')}\n{s.get('body', '')}\n\n"
-    full_text += data.get("conclusion", "") + "\n\n"
+        full_text += f"[{s.get('type','')}] {s.get('heading','')}\n"
+        if s.get('quote'):
+            full_text += f'"{s.get("quote","")}" \n\n'
+        full_text += s.get('body', '') + "\n\n"
     full_text += " ".join(f"#{t}" for t in data.get("hashtags", []))
 
     with st.expander("📋 전체 글 복사"):
