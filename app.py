@@ -8,7 +8,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-_api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", "")
+try:
+    _api_key = st.secrets["OPENAI_API_KEY"]
+except Exception:
+    _api_key = os.getenv("OPENAI_API_KEY", "")
+
+if not _api_key:
+    st.error("OPENAI_API_KEY가 설정되지 않았습니다. Streamlit Cloud Secrets에 키를 추가해주세요.")
+    st.stop()
+
 client = openai.OpenAI(api_key=_api_key)
 
 # ── System Prompts ─────────────────────────────────────────────────────────────
