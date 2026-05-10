@@ -321,29 +321,14 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-# ── 입력 카드 ─────────────────────────────────────────────────────────────────
+# ── Session State ─────────────────────────────────────────────────────────────
 
-if "seo_result" not in st.session_state:
-    st.session_state.seo_result = None
-if "seo_images" not in st.session_state:
-    st.session_state.seo_images = []
+for key, default in [("seo_result", None), ("seo_images", []),
+                     ("img_only_images", [])]:
+    if key not in st.session_state:
+        st.session_state[key] = default
 
-st.markdown("""
-<div class="input-card">
-  <div class="input-card-label">어떤 주제로 블로그를 써볼까요?</div>
-  <div class="input-card-sub">키워드나 주제를 입력하면 SEO 최적화 글과 이미지 3장을 자동으로 만들어드립니다.</div>
-</div>
-""", unsafe_allow_html=True)
-
-examples = ["강남 브런치 카페", "재택근무 생산성", "제주도 한달살기", "홈카페 인테리어", "다이어트 식단"]
-chips_html = "".join(f'<span class="chip">#{e}</span>' for e in examples)
-st.markdown(f'<div style="margin-bottom:16px;"><div style="font-size:0.8rem;color:#aaa;margin-bottom:8px;">예시 키워드</div><div class="example-chips">{chips_html}</div></div>', unsafe_allow_html=True)
-
-keyword = st.text_input(
-    label="keyword",
-    placeholder="예: 강남 브런치 카페, 재택근무 생산성 높이는 법, 제주도 한달살기...",
-    label_visibility="collapsed",
-)
+# ── 아이콘 로드 ───────────────────────────────────────────────────────────────
 
 icon_path = pathlib.Path(__file__).parent / "icon_generate.png"
 icon_html = ""
@@ -352,143 +337,231 @@ if icon_path.exists():
         icon_b64 = base64.b64encode(f.read()).decode()
     icon_html = f'<img src="data:image/png;base64,{icon_b64}" style="width:52px;height:52px;object-fit:contain;display:block;margin:0 auto;" alt="generate"/>'
 
-col_icon, col_btn, _ = st.columns([0.7, 2.3, 3])
-with col_icon:
-    if icon_html:
-        st.markdown(
-            f'<div style="display:flex;align-items:center;height:100%;padding-top:4px;">{icon_html}</div>',
-            unsafe_allow_html=True,
-        )
-with col_btn:
-    generate = st.button("SEO 글 + 이미지 생성", type="primary",
-                         disabled=not keyword.strip(), use_container_width=True)
+# ── 탭 ────────────────────────────────────────────────────────────────────────
 
-if generate:
-    st.session_state.seo_result = None
-    st.session_state.seo_images = []
+tab1, tab2 = st.tabs(["📝 SEO 글 + 이미지", "🖼️ 원문 → 이미지"])
 
-    with st.spinner("SEO 블로그 글 작성 중 (GPT-4o)..."):
-        try:
-            st.session_state.seo_result = generate_seo_blog(keyword)
-        except Exception as e:
-            st.error(f"글 생성 실패: {e}")
-            st.stop()
+# ════════════════════════════════════════════════════════
+# TAB 1 — 키워드 → SEO 글 + 이미지
+# ════════════════════════════════════════════════════════
+with tab1:
+    st.markdown("""
+    <div class="input-card">
+      <div class="input-card-label">어떤 주제로 블로그를 써볼까요?</div>
+      <div class="input-card-sub">키워드나 주제를 입력하면 SEO 최적화 글과 이미지 3장을 자동으로 만들어드립니다.</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    data = st.session_state.seo_result
-    blog_content = " ".join(s["body"] for s in data.get("sections", []))
+    examples = ["강남 브런치 카페", "재택근무 생산성", "제주도 한달살기", "홈카페 인테리어", "다이어트 식단"]
+    chips_html = "".join(f'<span class="chip">#{e}</span>' for e in examples)
+    st.markdown(f'<div style="margin-bottom:16px;"><div style="font-size:0.8rem;color:#aaa;margin-bottom:8px;">예시 키워드</div><div class="example-chips">{chips_html}</div></div>', unsafe_allow_html=True)
 
-    with st.spinner("이미지 프롬프트 생성 중..."):
-        try:
-            img_prompts = generate_image_prompts(blog_content)
-        except Exception as e:
-            st.error(f"이미지 프롬프트 생성 실패: {e}")
-            img_prompts = []
+    keyword = st.text_input(
+        label="keyword",
+        placeholder="예: 강남 브런치 카페, 재택근무 생산성 높이는 법, 제주도 한달살기...",
+        label_visibility="collapsed",
+    )
 
-    for i, item in enumerate(img_prompts):
-        with st.spinner(f"이미지 {i + 1}/3 생성 중 (gpt-image-1.5)..."):
+    col_icon, col_btn, _ = st.columns([0.7, 2.3, 3])
+    with col_icon:
+        if icon_html:
+            st.markdown(
+                f'<div style="display:flex;align-items:center;height:100%;padding-top:4px;">{icon_html}</div>',
+                unsafe_allow_html=True,
+            )
+    with col_btn:
+        generate = st.button("SEO 글 + 이미지 생성", type="primary",
+                             disabled=not keyword.strip(), use_container_width=True)
+
+    if generate:
+        st.session_state.seo_result = None
+        st.session_state.seo_images = []
+
+        with st.spinner("SEO 블로그 글 작성 중 (GPT-4o)..."):
             try:
-                st.session_state.seo_images.append({
-                    "description": item["description"],
-                    "prompt": item["prompt"],
-                    "image_bytes": generate_image(item["prompt"]),
-                })
+                st.session_state.seo_result = generate_seo_blog(keyword)
             except Exception as e:
-                st.error(f"이미지 {i + 1} 생성 실패: {e}")
+                st.error(f"글 생성 실패: {e}")
+                st.stop()
 
-# ── 결과 표시 ─────────────────────────────────────────────────────────────────
+        data = st.session_state.seo_result
+        blog_content = " ".join(s["body"] for s in data.get("sections", []))
 
-if st.session_state.seo_result:
-    data = st.session_state.seo_result
-    st.divider()
+        with st.spinner("이미지 프롬프트 생성 중..."):
+            try:
+                img_prompts = generate_image_prompts(blog_content)
+            except Exception as e:
+                st.error(f"이미지 프롬프트 생성 실패: {e}")
+                img_prompts = []
 
-    # 제목
-    st.markdown(f"""
-    <div class="card-purple">
-        <div class="title-label">제목</div>
-        <div class="title-text">{data.get('title', '')}</div>
-    </div>""", unsafe_allow_html=True)
+        for i, item in enumerate(img_prompts):
+            with st.spinner(f"이미지 {i + 1}/3 생성 중 (gpt-image-1.5)..."):
+                try:
+                    st.session_state.seo_images.append({
+                        "description": item["description"],
+                        "prompt": item["prompt"],
+                        "image_bytes": generate_image(item["prompt"]),
+                    })
+                except Exception as e:
+                    st.error(f"이미지 {i + 1} 생성 실패: {e}")
 
-    # 연관 키워드
-    related = data.get("related_keywords", [])
-    if related:
-        kw_html = "".join(f'<span class="chip">#{k}</span>' for k in related)
-        st.markdown(
-            f'<div style="margin-bottom:20px;"><div style="font-size:0.8rem;color:#aaa;margin-bottom:8px;">연관 키워드</div>'
-            f'<div class="example-chips">{kw_html}</div></div>',
-            unsafe_allow_html=True,
-        )
-
-    # 섹션별 카드 (소제목 → 인용구 → 본문)
-    section_colors = {"서론": "card-white", "본론1": "card-yellow", "본론2": "card-blue", "결론": "card-purple"}
-    for section in data.get("sections", []):
-        stype  = section.get("type", "")
-        card_c = section_colors.get(stype, "card-white")
-        label  = stype
-        heading = section.get("heading", "")
-        quote   = section.get("quote", "")
-        body    = section.get("body", "")
+    if st.session_state.seo_result:
+        data = st.session_state.seo_result
+        st.divider()
 
         st.markdown(f"""
-        <div class="{card_c}" style="margin-bottom:6px;">
-            <div class="title-label">{label}</div>
-            <div class="section-heading" style="font-size:1.15rem;margin-bottom:12px;">{heading}</div>
+        <div class="card-purple">
+            <div class="title-label">제목</div>
+            <div class="title-text">{data.get('title', '')}</div>
         </div>""", unsafe_allow_html=True)
 
-        if quote:
+        related = data.get("related_keywords", [])
+        if related:
+            kw_html = "".join(f'<span class="chip">#{k}</span>' for k in related)
+            st.markdown(
+                f'<div style="margin-bottom:20px;"><div style="font-size:0.8rem;color:#aaa;margin-bottom:8px;">연관 키워드</div>'
+                f'<div class="example-chips">{kw_html}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        section_colors = {"서론": "card-white", "본론1": "card-yellow", "본론2": "card-blue", "결론": "card-purple"}
+        for section in data.get("sections", []):
+            stype   = section.get("type", "")
+            card_c  = section_colors.get(stype, "card-white")
+            heading = section.get("heading", "")
+            quote   = section.get("quote", "")
+            body    = section.get("body", "")
+
             st.markdown(f"""
-            <div style="border-left:4px solid #C0392B;background:#FDF5F4;
-                        border-radius:0 12px 12px 0;padding:14px 20px;
-                        margin-bottom:6px;font-size:0.97rem;color:#7a2020;
-                        font-style:italic;line-height:1.7;">
-                {quote}
+            <div class="{card_c}" style="margin-bottom:6px;">
+                <div class="title-label">{stype}</div>
+                <div class="section-heading" style="font-size:1.15rem;margin-bottom:12px;">{heading}</div>
             </div>""", unsafe_allow_html=True)
 
+            if quote:
+                st.markdown(f"""
+                <div style="border-left:4px solid #C0392B;background:#FDF5F4;
+                            border-radius:0 12px 12px 0;padding:14px 20px;
+                            margin-bottom:6px;font-size:0.97rem;color:#7a2020;
+                            font-style:italic;line-height:1.7;">{quote}</div>""",
+                            unsafe_allow_html=True)
+
+            st.markdown(f"""
+            <div class="card-white" style="margin-bottom:20px;">
+                <div style="line-height:1.9;font-size:0.97rem;">{body}</div>
+            </div>""", unsafe_allow_html=True)
+
+        tags_html = "".join(f'<span class="hashtag">#{t}</span>' for t in data.get("hashtags", []))
         st.markdown(f"""
-        <div class="card-white" style="margin-bottom:20px;">
-            <div style="line-height:1.9;font-size:0.97rem;">{body}</div>
+        <div class="card-white">
+            <div class="section-heading">해시태그</div>
+            <div class="hashtag-wrap">{tags_html}</div>
         </div>""", unsafe_allow_html=True)
 
-    # 해시태그
-    tags_html = "".join(f'<span class="hashtag">#{t}</span>' for t in data.get("hashtags", []))
-    st.markdown(f"""
-    <div class="card-white">
-        <div class="section-heading">해시태그</div>
-        <div class="hashtag-wrap">{tags_html}</div>
-    </div>""", unsafe_allow_html=True)
+        full_text = f"{data.get('title', '')}\n\n"
+        for s in data.get("sections", []):
+            full_text += f"[{s.get('type','')}] {s.get('heading','')}\n"
+            if s.get('quote'):
+                full_text += f'"{s.get("quote","")}" \n\n'
+            full_text += s.get('body', '') + "\n\n"
+        full_text += " ".join(f"#{t}" for t in data.get("hashtags", []))
 
-    # 전체 글 복사
-    full_text = f"{data.get('title', '')}\n\n"
-    for s in data.get("sections", []):
-        full_text += f"[{s.get('type','')}] {s.get('heading','')}\n"
-        if s.get('quote'):
-            full_text += f'"{s.get("quote","")}" \n\n'
-        full_text += s.get('body', '') + "\n\n"
-    full_text += " ".join(f"#{t}" for t in data.get("hashtags", []))
+        with st.expander("📋 전체 글 복사"):
+            st.text_area(label="copy", value=full_text, height=300,
+                         label_visibility="collapsed", key="copy_area")
 
-    with st.expander("📋 전체 글 복사"):
-        st.text_area(label="copy", value=full_text, height=300,
-                     label_visibility="collapsed", key="copy_area")
+        if st.session_state.seo_images:
+            st.divider()
+            st.markdown("### 생성된 이미지")
+            cols = st.columns(3)
+            for i, (col, result) in enumerate(zip(cols, st.session_state.seo_images)):
+                with col:
+                    st.image(result["image_bytes"], use_container_width=True)
+                    st.markdown(f"**{result['description']}**")
+                    with st.expander(f"✏️ 프롬프트 {i + 1} 보기 / 수정"):
+                        edited = st.text_area(
+                            label="p", value=result["prompt"],
+                            key=f"p_{i}", height=240, label_visibility="collapsed",
+                        )
+                        st.caption("프롬프트를 수정하고 버튼을 누르면 해당 이미지만 다시 생성합니다.")
+                        if st.button(f"🔄 이미지 {i + 1} 다시 생성", key=f"regen_{i}", type="secondary"):
+                            with st.spinner("재생성 중..."):
+                                try:
+                                    st.session_state.seo_images[i]["image_bytes"] = generate_image(edited)
+                                    st.session_state.seo_images[i]["prompt"] = edited
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"재생성 실패: {e}")
 
-    # 이미지
-    if st.session_state.seo_images:
+# ════════════════════════════════════════════════════════
+# TAB 2 — 블로그 원문 → 이미지 생성
+# ════════════════════════════════════════════════════════
+with tab2:
+    st.markdown("""
+    <div class="input-card">
+      <div class="input-card-label">블로그 원문을 붙여넣어 주세요</div>
+      <div class="input-card-sub">작성된 블로그 글을 분석해 어울리는 이미지 3장을 만들어드립니다.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    blog_raw = st.text_area(
+        label="blog_raw",
+        placeholder="블로그 글 전체를 여기에 붙여넣으세요...",
+        height=280,
+        label_visibility="collapsed",
+    )
+
+    col_icon2, col_btn2, _ = st.columns([0.7, 2.3, 3])
+    with col_icon2:
+        if icon_html:
+            st.markdown(
+                f'<div style="display:flex;align-items:center;height:100%;padding-top:4px;">{icon_html}</div>',
+                unsafe_allow_html=True,
+            )
+    with col_btn2:
+        generate2 = st.button("이미지 3장 생성", type="primary",
+                              disabled=not blog_raw.strip(), use_container_width=True)
+
+    if generate2:
+        st.session_state.img_only_images = []
+
+        with st.spinner("이미지 프롬프트 생성 중..."):
+            try:
+                img_prompts2 = generate_image_prompts(blog_raw)
+            except Exception as e:
+                st.error(f"프롬프트 생성 실패: {e}")
+                img_prompts2 = []
+
+        for i, item in enumerate(img_prompts2):
+            with st.spinner(f"이미지 {i + 1}/3 생성 중 (gpt-image-1.5)..."):
+                try:
+                    st.session_state.img_only_images.append({
+                        "description": item["description"],
+                        "prompt": item["prompt"],
+                        "image_bytes": generate_image(item["prompt"]),
+                    })
+                except Exception as e:
+                    st.error(f"이미지 {i + 1} 생성 실패: {e}")
+
+    if st.session_state.img_only_images:
         st.divider()
         st.markdown("### 생성된 이미지")
-        cols = st.columns(3)
-        for i, (col, result) in enumerate(zip(cols, st.session_state.seo_images)):
+        cols2 = st.columns(3)
+        for i, (col, result) in enumerate(zip(cols2, st.session_state.img_only_images)):
             with col:
                 st.image(result["image_bytes"], use_container_width=True)
                 st.markdown(f"**{result['description']}**")
                 with st.expander(f"✏️ 프롬프트 {i + 1} 보기 / 수정"):
-                    edited = st.text_area(
-                        label="p", value=result["prompt"],
-                        key=f"p_{i}", height=240, label_visibility="collapsed",
+                    edited2 = st.text_area(
+                        label="p2", value=result["prompt"],
+                        key=f"p2_{i}", height=240, label_visibility="collapsed",
                     )
                     st.caption("프롬프트를 수정하고 버튼을 누르면 해당 이미지만 다시 생성합니다.")
-                    if st.button(f"🔄 이미지 {i + 1} 다시 생성", key=f"regen_{i}", type="secondary"):
+                    if st.button(f"🔄 이미지 {i + 1} 다시 생성", key=f"regen2_{i}", type="secondary"):
                         with st.spinner("재생성 중..."):
                             try:
-                                st.session_state.seo_images[i]["image_bytes"] = generate_image(edited)
-                                st.session_state.seo_images[i]["prompt"] = edited
+                                st.session_state.img_only_images[i]["image_bytes"] = generate_image(edited2)
+                                st.session_state.img_only_images[i]["prompt"] = edited2
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"재생성 실패: {e}")
