@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+_api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", "")
+client = openai.OpenAI(api_key=_api_key)
 
 # ── System Prompts ─────────────────────────────────────────────────────────────
 
